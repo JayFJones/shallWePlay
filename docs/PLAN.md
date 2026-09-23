@@ -16,18 +16,20 @@ bounded view into any real system.
 
 ## How it works
 
-One Node process listens on port 5171. It does three jobs:
+One Node process listens on port 5171. It does four jobs:
 
-1. Holds the one game table: the board, whose turn it is, who sits where.
+1. Holds a lobby of game tables. Each table has a board, two seats, and
+   whose turn it is.
 2. Speaks MCP over HTTP at `/mcp`. AI players connect here.
-3. Serves a static page at `/`. It shows the board live, and a person can
-   click to take a seat and play.
+3. Appends every finished game to `data/history.jsonl`.
+4. Serves the read-only admin panel at `/admin`: live tables, the history,
+   and a move-by-move replay.
 
 ```
-Claude Code (X) ──MCP──┐
-                       ├── WOPR on :5171 ── one table
-Claude Code (O) ──MCP──┤
-Browser (watch/play) ──┘   (plain HTTP + live updates)
+Claude Code (X) ──MCP──┐                  ┌── table 1
+Claude Code (O) ──MCP──┼── WOPR on :5171 ─┼── table 2 ...
+Claude Code ... ──MCP──┘        │         └── data/history.jsonl
+Browser /admin ──live stream────┘
 ```
 
 ## MCP surface
@@ -36,18 +38,19 @@ Browser (watch/play) ──┘   (plain HTTP + live updates)
 
 | tool | what it does |
 | --- | --- |
-| `join_game(name)` | takes a free seat and returns X or O. Refuses if both seats are taken. |
+| `join_game(name)` | seats you next to a waiting player, or at a new table. Returns your table and X or O. |
 | `get_board()` | returns the board, whose turn it is, and the result if the game is over. |
 | `make_move(square)` | plays square 1 to 9. Refuses if it is not your turn, the square is taken, or the game is over. |
 | `wait_for_turn(timeout_seconds)` | waits until it is your turn or the game ends. Returns early with "still waiting" after the timeout, so the model can call it again. |
-| `new_game()` | clears the board for the same two players. X and O swap who goes first. |
+| `new_game()` | clears the board for the same two players. Whoever moved second last time moves first. |
 | `leave_game()` | gives up your seat. |
 
 The seat belongs to the MCP session. One player cannot move for the other.
 
 ### Resource
 
-`wopr://board`, the board as text. A client can read it without a tool call.
+`wopr://board`, the board at your table as text. A client can read it
+without a tool call.
 
 ### Prompt
 
@@ -67,11 +70,17 @@ move, repeat until it ends. In Claude Code it shows up as the slash command
 | file | holds |
 | --- | --- |
 | `src/game/rules.ts` | pure rules: legal moves, win lines, draw. No I/O. |
-| `src/game/table.ts` | the one table: seats, turn, waiters, draw count. |
+| `src/game/table.ts` | one table: seats, turn, waiters, draw count, finished-game records. |
+| `src/game/lobby.ts` | all tables, and who sits at which. |
+| `src/mcp/text.ts` | every word the model reads. |
 | `src/mcp/server.ts` | the tools, resource, and prompt. |
-| `src/http.ts` | the HTTP server: `/mcp`, the page, live updates. |
-| `public/index.html` | the static page. |
-| `scripts/dev` | `up`, `down`, `status`, `logs`, `restart`, using `.dev/`. |
+| `src/sessions.ts` | live MCP sessions and the idle sweep. |
+| `src/history.ts` | finished games, in memory and in `data/history.jsonl`. |
+| `src/admin.ts` | the admin panel's JSON and live stream. |
+| `src/http.ts` | the HTTP server that ties them together. |
+| `public/admin.html` | the admin panel. |
+| `public/index.html` | the page where a person plays. Step 6. |
+| `scripts/dev` | `up`, `down`, `status`, `logs`, `restart`, using `.dev/`. Step 6. |
 
 ## Build order
 
@@ -84,7 +93,10 @@ Each step leaves something that works, and gets its own commit.
 4. The MCP server over HTTP with `join_game`, `get_board`, `make_move`.
    Connect one Claude Code window and play a few moves.
 5. Add `wait_for_turn`, `new_game`, `leave_game`, the resource, and the
-   prompt. Play a full game between two Claude Code windows.
+   prompt. Play a full game between two Claude Code windows. Added on
+   request: many tables, the history file, and the admin panel. Done
+   2026-09-23: two `claude -p` sessions played 3 games from the
+   `shall_we_play` prompt, drew all 3, and got the strange game line.
 6. The static page and `scripts/dev`. A person plays one AI.
 7. `TRANSCRIPT.md`: one full AI against AI game from both windows, with the
    tool calls, and one cheat attempt refused.

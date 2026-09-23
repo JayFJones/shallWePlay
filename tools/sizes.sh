@@ -25,6 +25,7 @@ src/mcp/server.ts                  190
 src/http.ts                        120
 src/sessions.ts                    100
 src/history.ts                     80
+src/admin.ts                       80
 "
 
 fat=0
