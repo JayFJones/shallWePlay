@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.dev/
+
+# Private planning notes. The brief names past employers.
+DEMO_BRIEF.md
+WORKING-NOTES.md
+SETUP.md
+
+# Written by the skills installer. Somebody else's prompt files.
+.agents/
+.claude/
+skills-lock.json
