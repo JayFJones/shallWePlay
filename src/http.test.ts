@@ -138,21 +138,80 @@ test('the admin state lists live tables and finished games', async () => {
   assert.deepEqual(state.history.map((g) => g.moves.length), [9]);
 });
 
-test('the admin stream sends the state at once and again on every change', async () => {
+// Reads server-sent events off a fetch body, one whole event at a time.
+function eventReader(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  return async function next(wanted: string): Promise<any> {
+    for (;;) {
+      const end = buffer.indexOf('\n\n');
+      if (end >= 0) {
+        const frame = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const event = /^event: (.*)$/m.exec(frame)?.[1];
+        const data = /^data: (.*)$/m.exec(frame)?.[1];
+        if (event === wanted && data) return JSON.parse(data);
+        continue;
+      }
+      const { value, done } = await reader.read();
+      if (done) throw new Error(`stream ended before a ${wanted} event`);
+      buffer += decoder.decode(value, { stream: true });
+    }
+  };
+}
+
+test('the admin stream sends the state at once, then state and MCP calls as they happen', async () => {
   const controller = new AbortController();
   const res = await fetch(`${wopr.url}/api/events`, { signal: controller.signal });
   assert.equal(res.headers.get('content-type'), 'text/event-stream');
-  const reader = res.body!.getReader();
-  const next = async (): Promise<{ tables: { players: { X: string | null } }[] }> => {
-    const { value } = await reader.read();
-    return JSON.parse(new TextDecoder().decode(value).replace(/^data: /, ''));
-  };
+  const next = eventReader(res.body!);
 
-  assert.equal((await next()).tables.length, 1);
+  assert.equal((await next('state')).tables.length, 1);
   const seated = await connect();
   await call(seated, 'join_game', { name: 'Newcomer' });
-  assert.equal((await next()).tables[0]!.players.X, 'Newcomer');
+  assert.equal((await next('state')).tables[0].players.X, 'Newcomer');
+
+  let joined;
+  do joined = await next('call');
+  while (joined.request.params?.name !== 'join_game');
+  assert.equal(joined.method, 'tools/call');
+  assert.deepEqual(joined.request.params.arguments, { name: 'Newcomer' });
+  assert.deepEqual(joined.player, { name: 'Newcomer', mark: 'X' });
+  assert.equal(joined.endpoint.path, '/mcp');
+  assert.ok(joined.endpoint.protocolVersion);
   controller.abort();
+});
+
+test('every MCP call of a finished game can be read back, refusals included', async () => {
+  const [game] = wopr.history.list().slice(-1);
+  const res = await fetch(`${wopr.url}/api/games/${game!.game}/calls`);
+  const calls = (await res.json()) as { request: { params?: { name?: string; arguments?: { square?: number } } }; failed: boolean }[];
+  const moves = calls.filter((c) => c.request.params?.name === 'make_move');
+
+  assert.deepEqual(
+    moves.filter((c) => !c.failed).map((c) => c.request.params!.arguments!.square),
+    game!.moves,
+    'the successful make_move calls are the game, in order',
+  );
+  assert.ok(moves.some((c) => c.failed), 'the out-of-turn move is in the log as a refusal');
+});
+
+test('the catalog lists every MCP command, straight from the server', async () => {
+  const catalog = (await (await fetch(`${wopr.url}/api/catalog`)).json()) as {
+    server: { name: string };
+    methods: { method: string }[];
+    tools: { name: string; inputSchema: { properties?: Record<string, unknown> } }[];
+    resources: { uri: string }[];
+    prompts: { name: string }[];
+  };
+  assert.equal(catalog.server.name, 'wopr');
+  assert.ok(catalog.methods.some((m) => m.method === 'tools/call'));
+  assert.equal(catalog.tools.length, 6);
+  assert.ok(catalog.tools.find((t) => t.name === 'make_move')!.inputSchema.properties!.square);
+  assert.deepEqual(catalog.resources.map((r) => r.uri), ['wopr://board']);
+  assert.deepEqual(catalog.prompts.map((p) => p.name), ['shall_we_play']);
+  assert.equal(wopr.lobby.views().length, 1, 'building the catalog seats nobody');
 });
 
 test('the admin page is served', async () => {

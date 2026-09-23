@@ -11,6 +11,7 @@ import { Lobby } from './game/lobby.js';
 import { History } from './history.js';
 import { createWoprServer } from './mcp/server.js';
 import { DEFAULT_IDLE, Sessions, type IdleLimits } from './sessions.js';
+import { Traffic } from './traffic.js';
 
 // Localhost only. createMcpExpressApp then also checks the Host header,
 // which stops a web page elsewhere from reaching this server through DNS
@@ -22,21 +23,25 @@ export interface WoprOptions {
   log?: (message: string) => void;
   idle?: IdleLimits;
   sweepMs?: number;
-  // Where finished games are appended. Leave out to keep them in memory.
+  // Where finished games and MCP calls are appended. Leave out to keep
+  // them in memory.
   historyFile?: string;
+  callsFile?: string;
 }
 
 export interface Wopr {
   url: string;
   lobby: Lobby;
   history: History;
+  traffic: Traffic;
   close(): Promise<void>;
 }
 
 export function startWopr(options: WoprOptions): Promise<Wopr> {
-  const { port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000, historyFile } = options;
+  const { port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000, historyFile, callsFile } = options;
   const lobby = new Lobby();
   const history = new History(historyFile ?? null, log);
+  const traffic = new Traffic(lobby, callsFile ?? null, log);
   lobby.onFinish((game) => {
     const { id, table, outcome } = history.record(game);
     log(`game ${id} at table ${table} ended: ${outcome.kind}`);
@@ -70,6 +75,7 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
     };
 
     await createWoprServer(lobby).connect(transport);
+    traffic.tap(transport);
     await transport.handleRequest(req, res, req.body);
   }
 
@@ -83,7 +89,7 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
   app.post('/mcp', handlePost);
   app.get('/mcp', handleSession);
   app.delete('/mcp', handleSession);
-  const admin = mountAdmin(app, lobby, history);
+  const admin = mountAdmin(app, { lobby, history, traffic });
 
   const sweeper = setInterval(() => sessions.sweep(), sweepMs);
 
@@ -95,6 +101,7 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
         url: `http://localhost:${bound}`,
         lobby,
         history,
+        traffic,
         close: async () => {
           clearInterval(sweeper);
           admin.close();
