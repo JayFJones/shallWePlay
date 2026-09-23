@@ -10,6 +10,7 @@ cd "$(dirname "$0")/.."
 # file                             budget
 BUDGETS="
 src/game/rules.ts                  90
+src/game/table.ts                  200
 "
 
 fat=0

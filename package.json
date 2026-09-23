@@ -9,8 +9,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
-    "test": "tsc && node --test \"dist/**/*.test.js\"",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
+    "test": "npm run build && node --test \"dist/**/*.test.js\"",
     "check": "./tools/check.sh"
   },
   "devDependencies": {
