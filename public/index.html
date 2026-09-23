@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOPR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+  :root {
+    --bg: #020a04;
+    --panel: #04140a;
+    --line: #0f3d1f;
+    --fg: #33ff66;
+    --dim: #1d9e44;
+    --faint: #0f5a28;
+    --hot: #ccffd9;
+    --warn: #ffcc33;
+    --mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'VT323', var(--mono);
+    font-size: 24px;
+    line-height: 1.3;
+    text-shadow: 0 0 5px rgba(51, 255, 102, 0.5);
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.18) 2px 3px);
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  .screen { white-space: pre-wrap; min-height: 6em; }
+  .cursor::after { content: '\2588'; animation: blink 1s steps(1) infinite; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .muted { color: var(--dim); }
+  .warn { color: var(--warn); }
+  .hot { color: var(--hot); }
+
+  form.logon { display: flex; gap: 12px; align-items: baseline; margin-top: 24px; }
+  form.logon input {
+    font: inherit; color: var(--hot); background: transparent; border: 0; border-bottom: 1px solid var(--dim);
+    outline: none; min-width: 0; flex: 1; max-width: 360px; text-shadow: inherit; caret-color: var(--fg);
+  }
+
+  .game { display: flex; flex-wrap: wrap; gap: 24px 40px; align-items: flex-start; margin-top: 12px; }
+  .board { display: grid; grid-template-columns: repeat(3, 88px); grid-template-rows: repeat(3, 88px); gap: 4px; background: var(--faint); }
+  .board button {
+    font: inherit; font-size: 56px; color: var(--fg); background: var(--panel); border: 0; padding: 0;
+    text-shadow: inherit; cursor: default;
+  }
+  .board button.open { color: var(--faint); font-size: 26px; }
+  .board button.playable { cursor: pointer; }
+  .board button.playable:hover, .board button.playable:focus-visible { background: var(--line); color: var(--hot); outline: none; }
+  .board button.win { background: var(--fg); color: var(--bg); text-shadow: none; }
+  .side { flex: 1; min-width: 240px; }
+  .side p { margin: 0 0 10px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .actions button, form.logon button {
+    font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--dim); padding: 0 12px; cursor: pointer; text-shadow: inherit;
+  }
+  .actions button:hover, .actions button:focus-visible, form.logon button:hover, form.logon button:focus-visible {
+    background: var(--fg); color: var(--bg); text-shadow: none; outline: none;
+  }
+  .summon { margin-top: 20px; border: 1px solid var(--line); background: var(--panel); padding: 12px 14px; font-size: 20px; }
+  .summon code { display: block; font-family: var(--mono); font-size: 14px; color: var(--hot); text-shadow: none; margin: 6px 0 10px; overflow-x: auto; white-space: pre; }
+  footer { margin-top: 48px; font-size: 18px; color: var(--dim); }
+  footer a { color: var(--dim); }
+  footer a:hover { color: var(--hot); }
+</style>
+</head>
+<body>
+<main>
+  <div id="screen" class="screen cursor"></div>
+
+  <form class="logon" id="logon" hidden>
+    <label for="name">LOGON:</label>
+    <input id="name" name="name" maxlength="40" autocomplete="off" spellcheck="false" required>
+    <button type="submit">ENTER</button>
+  </form>
+
+  <div id="game" hidden>
+    <div class="game">
+      <div class="board" id="board"></div>
+      <div class="side">
+        <p id="who"></p>
+        <p id="status" class="hot"></p>
+        <p id="message" class="warn"></p>
+        <p id="strange" class="warn" hidden>A STRANGE GAME.<br>THE ONLY WINNING MOVE IS NOT TO PLAY.</p>
+        <div class="actions">
+          <button id="again" hidden>NEW GAME</button>
+          <button id="leave">LOG OFF</button>
+        </div>
+      </div>
+    </div>
+    <div class="summon" id="summon" hidden>
+      <div>NO OPPONENT YET. TO PLAY AN AI, CONNECT CLAUDE CODE TO WOPR:</div>
+      <code id="summon-add"></code>
+      <div>THEN, IN THAT CLAUDE CODE WINDOW:</div>
+      <code>/mcp__wopr__shall_we_play Joshua 1</code>
+      <div class="muted">A SECOND BROWSER TAB WORKS TOO, FOR TWO PEOPLE.</div>
+    </div>
+  </div>
+
+  <footer>WOPR. Tic-tac-toe for people and AI players over MCP. <a href="/admin">Admin panel</a></footer>
+</main>
+<script src="/play.js"></script>
+</body>
+</html>

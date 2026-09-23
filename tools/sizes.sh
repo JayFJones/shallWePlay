@@ -33,6 +33,7 @@ src/admin.ts                       100
 src/traffic.ts                     180
 src/catalog.ts                     80
 public/admin.js                    420
+public/play.js                     220
 "
 
 fat=0

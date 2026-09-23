@@ -13,7 +13,12 @@
     "build": "npm run clean && tsc",
     "start": "node dist/main.js",
     "test": "npm run build && node --test \"dist/**/*.test.js\"",
-    "check": "./tools/check.sh"
+    "check": "./tools/check.sh",
+    "dev:up": "scripts/dev up",
+    "dev:down": "scripts/dev down",
+    "dev:status": "scripts/dev status",
+    "dev:logs": "scripts/dev logs",
+    "dev:restart": "scripts/dev restart"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

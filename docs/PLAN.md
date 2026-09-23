@@ -82,8 +82,10 @@ move, repeat until it ends. In Claude Code it shows up as the slash command
 | `src/game/types.ts` | the shapes other files read: table view, game record, errors. |
 | `src/http.ts` | the HTTP server that ties them together. |
 | `public/admin.html`, `public/admin.js` | the admin panel. |
-| `public/index.html` | the page where a person plays. Step 6. |
-| `scripts/dev` | `up`, `down`, `status`, `logs`, `restart`, using `.dev/`. Step 6. |
+| `src/play.ts` | how a person plays: plain HTTP and a live stream. |
+| `src/mcp/endpoint.ts` | the `/mcp` endpoint and its sessions. |
+| `public/index.html`, `public/play.js` | the page where a person plays. |
+| `scripts/dev` | `up`, `down`, `status`, `logs`, `restart`, using `.dev/`. |
 
 ## Build order
 
@@ -100,7 +102,9 @@ Each step leaves something that works, and gets its own commit.
    request: many tables, the history file, and the admin panel. Done
    2026-09-23: two `claude -p` sessions played 3 games from the
    `shall_we_play` prompt, drew all 3, and got the strange game line.
-6. The static page and `scripts/dev`. A person plays one AI.
+6. The static page and `scripts/dev`. A person plays one AI. Done
+   2026-09-23: a script making the page's own HTTP calls played a real
+   `claude -p` session to a draw. Not yet seen in a real browser.
 7. `TRANSCRIPT.md`: one full AI against AI game from both windows, with the
    tool calls, and one cheat attempt refused.
 8. `README.md`, drafted in Jay's voice for Jay to edit.
@@ -221,6 +225,19 @@ server for its own list means the list cannot go stale.
 Gives up: disk. Every `wait_for_turn` is a line, about 20 per game. The
 file grows until someone deletes it. Only the last 20,000 calls are kept
 in memory.
+
+### A person plays over plain HTTP, not MCP (2026-09-23)
+
+The page at `/` joins, moves and leaves with plain HTTP posts, and gets
+its board from a live stream. The browser makes up a random token and
+keeps it, so a reload keeps the seat. An open page holds the seat. A
+closed page loses it after a minute.
+
+Why: the demo is about a model using MCP. A person needs no protocol, and
+the lobby cannot tell the two apart, which is the point.
+
+Gives up: a person's moves are not in the MCP call log. The admin replay
+shows only the AI side's calls for a mixed game.
 
 ### Defaults taken without a question (2026-09-23)
 
