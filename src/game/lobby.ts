@@ -19,6 +19,9 @@ export class Lobby {
     const result = table.join(id, name);
     if (!result.ok) return result;
     this.seatedAt.set(id, table);
+    // The table announced the change before the lobby knew where the player
+    // sat. Announce again, so a listener asking tableOf() gets the answer.
+    this.changed();
     return { ok: true, value: { table: table.id, mark: result.value } };
   }
 

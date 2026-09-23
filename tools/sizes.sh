@@ -26,6 +26,7 @@ src/mcp/text.ts                    110
 src/mcp/server.ts                  190
 src/http.ts                        90
 src/mcp/endpoint.ts                90
+src/play.ts                        120
 src/sessions.ts                    100
 src/history.ts                     80
 src/admin.ts                       100

@@ -7,6 +7,7 @@ import { mountAdmin } from './admin.js';
 import { Lobby } from './game/lobby.js';
 import { History } from './history.js';
 import { mountMcp } from './mcp/endpoint.js';
+import { mountPlay, type PlayOptions } from './play.js';
 import { DEFAULT_IDLE, type IdleLimits } from './sessions.js';
 import { Traffic } from './traffic.js';
 
@@ -24,6 +25,7 @@ export interface WoprOptions {
   // them in memory.
   historyFile?: string;
   callsFile?: string;
+  play?: Omit<PlayOptions, 'lobby'>;
 }
 
 export interface Wopr {
@@ -35,7 +37,7 @@ export interface Wopr {
 }
 
 export function startWopr(options: WoprOptions): Promise<Wopr> {
-  const { port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000, historyFile, callsFile } = options;
+  const { port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000, historyFile, callsFile, play } = options;
   const lobby = new Lobby();
   const history = new History(historyFile ?? null, log);
   const traffic = new Traffic(lobby, callsFile ?? null, log);
@@ -45,7 +47,11 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
   });
 
   const app = createMcpExpressApp({ host: HOST });
-  const mounts = [mountMcp(app, { lobby, traffic, idle, sweepMs, log }), mountAdmin(app, { lobby, history, traffic })];
+  const mounts = [
+    mountMcp(app, { lobby, traffic, idle, sweepMs, log }),
+    mountPlay(app, { lobby, ...play }),
+    mountAdmin(app, { lobby, history, traffic }),
+  ];
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, HOST, () => {

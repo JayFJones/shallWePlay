@@ -75,3 +75,11 @@ test('a closed table stops reporting', () => {
   table.join('z', 'Zed');
   assert.equal(changes, 0);
 });
+
+test('a change listener can already find a player who just joined', () => {
+  const lobby = new Lobby();
+  const seen: (string | undefined)[] = [];
+  lobby.onChange(() => seen.push(lobby.tableOf('a')?.id));
+  lobby.join('a', 'Alice');
+  assert.equal(seen.at(-1), '1');
+});
