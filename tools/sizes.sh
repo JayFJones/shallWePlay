@@ -24,7 +24,8 @@ src/mcp/text.ts                    110
 # a flat list of registrations and holds no state, so it grows only when
 # the MCP surface does.
 src/mcp/server.ts                  190
-src/http.ts                        120
+src/http.ts                        90
+src/mcp/endpoint.ts                90
 src/sessions.ts                    100
 src/history.ts                     80
 src/admin.ts                       100
