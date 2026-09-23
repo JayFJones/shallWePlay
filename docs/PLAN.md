@@ -77,8 +77,11 @@ move, repeat until it ends. In Claude Code it shows up as the slash command
 | `src/sessions.ts` | live MCP sessions and the idle sweep. |
 | `src/history.ts` | finished games, in memory and in `data/history.jsonl`. |
 | `src/admin.ts` | the admin panel's JSON and live stream. |
+| `src/traffic.ts` | every MCP message, recorded at the transport. |
+| `src/catalog.ts` | the list of MCP commands, read from the server itself. |
+| `src/game/types.ts` | the shapes other files read: table view, game record, errors. |
 | `src/http.ts` | the HTTP server that ties them together. |
-| `public/admin.html` | the admin panel. |
+| `public/admin.html`, `public/admin.js` | the admin panel. |
 | `public/index.html` | the page where a person plays. Step 6. |
 | `scripts/dev` | `up`, `down`, `status`, `logs`, `restart`, using `.dev/`. Step 6. |
 
@@ -199,6 +202,25 @@ be replayed afterwards.
 
 Gives up: two friends cannot pick a table to play each other. The lobby
 decides.
+
+### The admin panel shows the MCP traffic and the command list (2026-09-23)
+
+Jay asked to see the MCP endpoint and the command behind each move, and a
+list of every MCP command. The server records every JSON-RPC message at
+the transport, paired with its response, and tags it with the session,
+the protocol version header, the timing, and the game it touched. The
+replay shows those calls beside the board. The calls are appended to
+`data/calls.jsonl`, next to the history.
+
+The command list comes from a client that connects to a copy of the
+server in memory and asks for it.
+
+Why: recording at the transport shows what crossed the wire. Asking the
+server for its own list means the list cannot go stale.
+
+Gives up: disk. Every `wait_for_turn` is a line, about 20 per game. The
+file grows until someone deletes it. Only the last 20,000 calls are kept
+in memory.
 
 ### Defaults taken without a question (2026-09-23)
 
