@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STRANGE_GAME_DRAWS, Table } from './table.js';
+import { STRANGE_GAME_DRAWS, Table, type FinishedGame } from './table.js';
 
 function seated(): Table {
   const table = new Table();
@@ -208,4 +208,58 @@ test('a cancelled wait returns at once and stops listening', async () => {
   controller.abort();
   assert.equal((await waiting).status, 'still_waiting');
   assert.equal((Reflect.get(table, 'listeners') as Set<unknown>).size, 0);
+});
+
+test('a won game is reported once, with everything needed to replay it', () => {
+  let clock = Date.UTC(2026, 8, 23, 12, 0, 0);
+  const table = new Table('7', () => clock);
+  const games: FinishedGame[] = [];
+  table.onFinish((g) => games.push(g));
+  table.join('a', 'Alice');
+  table.join('b', 'Bob');
+  clock += 90_000;
+  playAll(table, X_WINS);
+  table.move('b', 9);
+
+  assert.deepEqual(games, [
+    {
+      table: '7',
+      players: { X: 'Alice', O: 'Bob' },
+      firstToMove: 'X',
+      moves: X_WINS,
+      outcome: { kind: 'win', winner: 'X', line: [1, 2, 3] },
+      startedAt: '2026-09-23T12:00:00.000Z',
+      endedAt: '2026-09-23T12:01:30.000Z',
+    },
+  ]);
+});
+
+test('a forfeit is reported with the leaver still named', () => {
+  const table = seated();
+  const games: FinishedGame[] = [];
+  table.onFinish((g) => games.push(g));
+  table.move('a', 5);
+  table.leave('b');
+  assert.equal(games.length, 1);
+  assert.deepEqual(games[0]!.players, { X: 'Alice', O: 'Bob' });
+  assert.deepEqual(games[0]!.outcome, { kind: 'forfeit', winner: 'X' });
+});
+
+test('leaving before any move reports no game', () => {
+  const table = seated();
+  let reported = 0;
+  table.onFinish(() => reported++);
+  table.leave('a');
+  assert.equal(reported, 0);
+});
+
+test('the next game records who went first and only its own moves', () => {
+  const table = seated();
+  const games: FinishedGame[] = [];
+  table.onFinish((g) => games.push(g));
+  playAll(table, X_WINS);
+  table.newGame('a');
+  playAll(table, DRAW);
+  assert.equal(games[1]!.firstToMove, 'O');
+  assert.deepEqual(games[1]!.moves, DRAW);
 });

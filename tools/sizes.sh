@@ -10,7 +10,11 @@ cd "$(dirname "$0")/.."
 # file                             budget
 BUDGETS="
 src/game/rules.ts                  90
-src/game/table.ts                  200
+# table.ts: raised from 200 when it began recording finished games for
+# the history. The record reads the private move list and clock, so it
+# belongs with them.
+src/game/table.ts                  250
+src/game/lobby.ts                  100
 src/mcp/text.ts                    80
 src/mcp/server.ts                  150
 src/http.ts                        120

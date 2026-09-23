@@ -1,5 +1,6 @@
-// The one game table everybody plays at. It knows who sits where and wakes
-// up players who are waiting. The rules themselves live in rules.ts.
+// One game table. It knows who sits where, wakes up players who are
+// waiting, and reports each finished game. The rules live in rules.ts, and
+// which player sits at which table is the lobby's business.
 
 import { applyMove, newGame, other, type Board, type GameState, type Mark, type MoveError, type Outcome } from './rules.js';
 
@@ -10,6 +11,7 @@ export type PlayerId = string;
 export type Ending = Outcome | { kind: 'forfeit'; winner: Mark };
 
 export interface TableView {
+  table: string;
   board: Board;
   toMove: Mark;
   outcome: Ending | null;
@@ -17,6 +19,17 @@ export interface TableView {
   you: Mark | null;
   drawStreak: number;
   strangeGame: boolean;
+}
+
+// Enough to replay the game square by square.
+export interface FinishedGame {
+  table: string;
+  players: Record<Mark, string | null>;
+  firstToMove: Mark;
+  moves: number[];
+  outcome: Ending;
+  startedAt: string;
+  endedAt: string;
 }
 
 export type TableError = MoveError | 'table_full' | 'not_seated' | 'no_opponent' | 'game_in_progress';
@@ -39,9 +52,20 @@ interface Seat {
 export class Table {
   private seats: Record<Mark, Seat | null> = { X: null, O: null };
   private game: GameState = newGame('X');
+  private first: Mark = 'X';
+  private moves: number[] = [];
+  private startedAt: number;
   private forfeitWinner: Mark | null = null;
   private drawStreak = 0;
   private listeners = new Set<() => void>();
+  private finishListeners = new Set<(game: FinishedGame) => void>();
+
+  constructor(
+    readonly id = '1',
+    private now: () => number = Date.now,
+  ) {
+    this.startedAt = now();
+  }
 
   join(id: PlayerId, name: string): Result<Mark> {
     const seated = this.markOf(id);
@@ -52,7 +76,7 @@ export class Table {
 
     this.seats[mark] = { id, name: name.trim().slice(0, NAME_LIMIT) || `Player ${mark}` };
     // A newcomer should not sit down to somebody else's finished game.
-    if (this.outcome()) this.reset(other(this.firstToMove()));
+    if (this.outcome()) this.reset(other(this.first));
     this.changed();
     return { ok: true, value: mark };
   }
@@ -65,6 +89,7 @@ export class Table {
     if (this.inProgress() && this.seats[other(mark)]) {
       this.forfeitWinner = other(mark);
       this.drawStreak = 0;
+      this.finished();
     }
     this.seats[mark] = null;
     this.changed();
@@ -81,8 +106,10 @@ export class Table {
     if (!result.ok) return result;
 
     this.game = result.state;
+    this.moves.push(square);
     if (this.game.outcome?.kind === 'draw') this.drawStreak += 1;
     if (this.game.outcome?.kind === 'win') this.drawStreak = 0;
+    if (this.game.outcome) this.finished();
     this.changed();
     return { ok: true, value: this.view(id) };
   }
@@ -97,28 +124,36 @@ export class Table {
     if (this.fresh()) return { ok: true, value: this.view(id) };
 
     // Whoever moved second last time moves first this time.
-    this.reset(other(this.firstToMove()));
+    this.reset(other(this.first));
     this.changed();
     return { ok: true, value: this.view(id) };
   }
 
   view(id?: PlayerId): TableView {
     return {
+      table: this.id,
       board: this.game.board,
       toMove: this.game.toMove,
       outcome: this.outcome(),
-      players: { X: this.seats.X?.name ?? null, O: this.seats.O?.name ?? null },
+      players: this.names(),
       you: id ? this.markOf(id) : null,
       drawStreak: this.drawStreak,
       strangeGame: this.drawStreak >= STRANGE_GAME_DRAWS,
     };
   }
 
+  isEmpty(): boolean {
+    return !this.seats.X && !this.seats.O;
+  }
+
+  hasFreeSeat(): boolean {
+    return !this.seats.X || !this.seats.O;
+  }
+
   // MCP clients call the server, never the other way round, so a player
   // cannot be told "your turn". Instead the call itself waits, and gives up
-  // after the timeout so it stays inside the client's tool time limit.
-  // A cancelled call stops waiting at once instead of holding a listener
-  // until the timeout.
+  // after the timeout so it stays inside the client's tool time limit. A
+  // cancelled call stops waiting at once instead of holding a listener.
   waitForTurn(id: PlayerId, timeoutMs: number, signal?: AbortSignal): Promise<{ status: WaitStatus; view: TableView }> {
     return new Promise((resolve) => {
       const check = (giveUp: boolean): boolean => {
@@ -143,6 +178,11 @@ export class Table {
     return () => this.listeners.delete(listener);
   }
 
+  onFinish(listener: (game: FinishedGame) => void): () => void {
+    this.finishListeners.add(listener);
+    return () => this.finishListeners.delete(listener);
+  }
+
   private waitStatus(id: PlayerId): WaitStatus {
     const mark = this.markOf(id);
     if (!mark) return 'not_seated';
@@ -157,29 +197,44 @@ export class Table {
     return null;
   }
 
+  private names(): Record<Mark, string | null> {
+    return { X: this.seats.X?.name ?? null, O: this.seats.O?.name ?? null };
+  }
+
   private outcome(): Ending | null {
     if (this.forfeitWinner) return { kind: 'forfeit', winner: this.forfeitWinner };
     return this.game.outcome;
   }
 
   private fresh(): boolean {
-    return !this.outcome() && this.game.board.every((cell) => cell === null);
+    return !this.outcome() && this.moves.length === 0;
   }
 
   private inProgress(): boolean {
-    return !this.outcome() && this.game.board.some((cell) => cell !== null);
+    return !this.outcome() && this.moves.length > 0;
   }
 
-  // Marks alternate, so after an even number of moves the mark to move is
-  // the one that went first. Saves keeping a second copy of that fact.
-  private firstToMove(): Mark {
-    const played = this.game.board.filter((cell) => cell !== null).length;
-    return played % 2 === 0 ? this.game.toMove : other(this.game.toMove);
-  }
-
-  private reset(firstToMove: Mark): void {
-    this.game = newGame(firstToMove);
+  private reset(first: Mark): void {
+    this.game = newGame(first);
+    this.first = first;
+    this.moves = [];
+    this.startedAt = this.now();
     this.forfeitWinner = null;
+  }
+
+  private finished(): void {
+    const outcome = this.outcome();
+    if (!outcome) return;
+    const game: FinishedGame = {
+      table: this.id,
+      players: this.names(),
+      firstToMove: this.first,
+      moves: [...this.moves],
+      outcome,
+      startedAt: new Date(this.startedAt).toISOString(),
+      endedAt: new Date(this.now()).toISOString(),
+    };
+    for (const listener of [...this.finishListeners]) listener(game);
   }
 
   // Copied first, because a listener may unsubscribe while we loop.

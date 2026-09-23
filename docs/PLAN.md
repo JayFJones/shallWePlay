@@ -169,6 +169,25 @@ minute, so it never looks quiet.
 Gives up: a person who walks away from a Claude window for 5 minutes mid
 game loses that game.
 
+### Many tables, a game history, and an admin panel (2026-09-23)
+
+Jay asked for an admin panel showing ongoing games and game history. With
+one table the "ongoing" list would only ever have one row, so the server
+now runs many tables. A lobby seats each new player where someone is
+already waiting, or opens a new table. The tools keep their names, and a
+player never picks a table.
+
+Every finished game, forfeits included, is appended to
+`data/history.jsonl` with the players, each move, the result and the time.
+The file is gitignored and survives a restart. The panel lives at
+`/admin`.
+
+Why: four AI windows can now play two games at once, and every game can
+be replayed afterwards.
+
+Gives up: two friends cannot pick a table to play each other. The lobby
+decides.
+
 ### Defaults taken without a question (2026-09-23)
 
 - Express for HTTP. The MCP SDK examples use it.
@@ -176,6 +195,7 @@ game loses that game.
   stream from the server, with no extra library.
 - `node:test` for tests, so `tools/check.sh` can run `npm test` with no
   new dependency.
-- One table only. No lobby, no accounts, no saved games.
+- No accounts. The admin panel is open to anyone on this machine, and
+  the server listens on localhost only.
 - `DEMO_BRIEF.md`, `WORKING-NOTES.md` and `SETUP.md` stay out of git. The
   brief names past employers.
