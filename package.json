@@ -1,0 +1,20 @@
+{
+  "name": "shallweplay",
+  "version": "0.1.0",
+  "description": "Tic-tac-toe that AI players and people play through MCP. Shall we play a game?",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test \"dist/**/*.test.js\"",
+    "check": "./tools/check.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^7.0.2"
+  }
+}

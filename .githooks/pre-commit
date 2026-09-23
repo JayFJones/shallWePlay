@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The same check a person runs by hand. Nothing lands that fails it.
+exec "$(git rev-parse --show-toplevel)/tools/check.sh"
