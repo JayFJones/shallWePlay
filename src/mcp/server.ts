@@ -1,22 +1,18 @@
 // The MCP face of WOPR. Every connection gets its own McpServer, and all of
-// them share one Table, which is how two separate AI players end up on one
-// board.
+// them share one Lobby, which is how separate AI players end up at the
+// same table.
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import type { Lobby } from '../game/lobby.js';
 import type { Table, TableError } from '../game/table.js';
-import { describe, REFUSALS } from './text.js';
+import { describe, describeWait, INSTRUCTIONS, playInstructions, REFUSALS } from './text.js';
 
-const INSTRUCTIONS = `GREETINGS. SHALL WE PLAY A GAME?
-
-This is WOPR, a tic-tac-toe table for two players. Squares are numbered 1 to 9:
- 1 | 2 | 3
- 4 | 5 | 6
- 7 | 8 | 9
-Call join_game to take a seat as X or O. Call get_board to see the board and
-whose turn it is. Call make_move with a square number on your turn. The
-server enforces the rules and refuses illegal moves.`;
+// Long enough that a model waiting on a slow opponent makes few calls.
+// Short enough to stay inside a client's tool time limit.
+const WAIT_DEFAULT_S = 30;
+const WAIT_MAX_S = 55;
 
 function said(text: string): CallToolResult {
   return { content: [{ type: 'text', text }] };
@@ -34,24 +30,33 @@ function playerOf(extra: { sessionId?: string }): string {
   return extra.sessionId;
 }
 
-export function createWoprServer(table: Table): McpServer {
+export function createWoprServer(lobby: Lobby): McpServer {
   const server = new McpServer({ name: 'wopr', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+
+  // Runs a tool body against the caller's table, or refuses if they have none.
+  const atTable =
+    (body: (table: Table, id: string) => CallToolResult | Promise<CallToolResult>) =>
+    (extra: { sessionId?: string }): CallToolResult | Promise<CallToolResult> => {
+      const id = playerOf(extra);
+      const table = lobby.tableOf(id);
+      return table ? body(table, id) : refused('not_seated');
+    };
 
   server.registerTool(
     'join_game',
     {
-      title: 'Join the game',
+      title: 'Join a game',
       description:
-        'Take a free seat at the tic-tac-toe table. The first player to join is X, the second is O. ' +
-        'Joining again keeps the seat you already have. Refused if both seats are taken.',
+        'Take a seat. You are put at a table where a player is waiting, or at a new table. ' +
+        'The first player at a table is X, the second is O. Joining again keeps the seat you have.',
       inputSchema: { name: z.string().describe('The name other players see for you, up to 40 characters.') },
       annotations: { idempotentHint: true, openWorldHint: false },
     },
     ({ name }, extra) => {
       const id = playerOf(extra);
-      const result = table.join(id, name);
+      const result = lobby.join(id, name);
       if (!result.ok) return refused(result.error);
-      return said(`You are ${result.value}.\n\n${describe(table.view(id))}`);
+      return said(`You are ${result.value.mark} at table ${result.value.table}.\n\n${describe(lobby.tableOf(id)!.view(id))}`);
     },
   );
 
@@ -60,11 +65,30 @@ export function createWoprServer(table: Table): McpServer {
     {
       title: 'Look at the board',
       description:
-        'Show the board, who sits where, whose turn it is, and the result if the game is over. ' +
-        'Open squares show their number. Anyone can call this, seated or not.',
+        'Show your table: the board, who sits where, whose turn it is, and the result if the game is over. ' +
+        'Open squares show their number. Returns at once. To wait for your turn, use wait_for_turn.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (extra) => said(describe(table.view(playerOf(extra)))),
+    atTable((table, id) => said(describe(table.view(id)))),
+  );
+
+  server.registerTool(
+    'wait_for_turn',
+    {
+      title: 'Wait for your turn',
+      description:
+        'Wait until it is your turn or the game ends, then show the board. ' +
+        `Gives up after timeout_seconds and answers STILL WAITING. Then call it again.`,
+      inputSchema: {
+        timeout_seconds: z.number().int().min(1).max(WAIT_MAX_S).optional().describe(`How long to wait, default ${WAIT_DEFAULT_S}.`),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ timeout_seconds }, extra) =>
+      atTable(async (table, id) => {
+        const { status, view } = await table.waitForTurn(id, (timeout_seconds ?? WAIT_DEFAULT_S) * 1000, extra.signal);
+        return status === 'not_seated' ? refused('not_seated') : said(describeWait(status, view));
+      })(extra),
   );
 
   server.registerTool(
@@ -78,10 +102,67 @@ export function createWoprServer(table: Table): McpServer {
       inputSchema: { square: z.number().int().min(1).max(9).describe('The square to play, 1 to 9.') },
       annotations: { destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ square }, extra) => {
-      const result = table.move(playerOf(extra), square);
-      if (!result.ok) return refused(result.error);
-      return said(describe(result.value));
+    ({ square }, extra) =>
+      atTable((table, id) => {
+        const result = table.move(id, square);
+        return result.ok ? said(describe(result.value)) : refused(result.error);
+      })(extra),
+  );
+
+  server.registerTool(
+    'new_game',
+    {
+      title: 'Start the next game',
+      description:
+        'Clear the board for the next game with the same opponent. Whoever moved second last time moves first. ' +
+        'Refused while a game is running. Asking when a new game has already started does nothing.',
+      annotations: { idempotentHint: true, openWorldHint: false },
+    },
+    atTable((table, id) => {
+      const result = table.newGame(id);
+      return result.ok ? said(describe(result.value)) : refused(result.error);
+    }),
+  );
+
+  server.registerTool(
+    'leave_game',
+    {
+      title: 'Leave the table',
+      description: 'Give up your seat. Leaving in the middle of a game forfeits it to the other player.',
+      annotations: { destructiveHint: true, openWorldHint: false },
+    },
+    (extra) => {
+      const result = lobby.leave(playerOf(extra));
+      return result.ok ? said('You have left the table. GOODBYE.') : refused(result.error);
+    },
+  );
+
+  server.registerResource(
+    'board',
+    'wopr://board',
+    { title: 'Your board', description: 'The board at your table, as text.', mimeType: 'text/plain' },
+    (uri, extra) => {
+      const id = playerOf(extra);
+      const table = lobby.tableOf(id);
+      return { contents: [{ uri: uri.href, text: table ? describe(table.view(id)) : REFUSALS.not_seated }] };
+    },
+  );
+
+  server.registerPrompt(
+    'shall_we_play',
+    {
+      title: 'Shall we play a game?',
+      description: 'Play a whole tic-tac-toe match on WOPR: join, wait, move, and repeat until the match ends.',
+      argsSchema: {
+        name: z.string().optional().describe('Your name at the table. Default: Joshua.'),
+        games: z.string().optional().describe('How many games to play. Default: 1.'),
+      },
+    },
+    ({ name, games }) => {
+      const count = Math.max(1, Math.min(10, Number.parseInt(games ?? '1', 10) || 1));
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text: playInstructions(name?.trim() || 'Joshua', count) } }],
+      };
     },
   );
 

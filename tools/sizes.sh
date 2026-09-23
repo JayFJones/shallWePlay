@@ -15,8 +15,13 @@ src/game/rules.ts                  90
 # belongs with them.
 src/game/table.ts                  250
 src/game/lobby.ts                  100
-src/mcp/text.ts                    80
-src/mcp/server.ts                  150
+# text.ts: raised from 80 when the greeting and the shall_we_play steps
+# moved in. It holds every word the model reads, on purpose, in one place.
+src/mcp/text.ts                    110
+# server.ts: raised from 150 for six tools, a resource and a prompt. It is
+# a flat list of registrations and holds no state, so it grows only when
+# the MCP surface does.
+src/mcp/server.ts                  190
 src/http.ts                        120
 src/sessions.ts                    100
 "

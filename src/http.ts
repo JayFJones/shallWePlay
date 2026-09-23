@@ -1,12 +1,12 @@
-// One process, one table. Every MCP connection is its own session with its
-// own transport and McpServer, all pointing at the same Table.
+// One process, one lobby of tables. Every MCP connection is its own session
+// with its own transport and McpServer, all pointing at the same Lobby.
 
 import { randomUUID } from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
-import { Table } from './game/table.js';
+import { Lobby } from './game/lobby.js';
 import { createWoprServer } from './mcp/server.js';
 import { DEFAULT_IDLE, Sessions, type IdleLimits } from './sessions.js';
 
@@ -24,13 +24,13 @@ export interface WoprOptions {
 
 export interface Wopr {
   url: string;
-  table: Table;
+  lobby: Lobby;
   close(): Promise<void>;
 }
 
 export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000 }: WoprOptions): Promise<Wopr> {
-  const table = new Table();
-  const sessions = new Sessions<StreamableHTTPServerTransport>(table, idle, log);
+  const lobby = new Lobby();
+  const sessions = new Sessions<StreamableHTTPServerTransport>(lobby, idle, log);
 
   // The spec answers an unknown session with 404, which tells a client to
   // start a new one. That matters once the idle sweep drops sessions.
@@ -58,7 +58,7 @@ export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs =
       if (transport.sessionId) sessions.end(transport.sessionId);
     };
 
-    await createWoprServer(table).connect(transport);
+    await createWoprServer(lobby).connect(transport);
     await transport.handleRequest(req, res, req.body);
   }
 
@@ -81,7 +81,7 @@ export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs =
       const bound = typeof address === 'object' && address ? address.port : port;
       resolve({
         url: `http://localhost:${bound}`,
-        table,
+        lobby,
         close: async () => {
           clearInterval(sweeper);
           await sessions.closeAll();

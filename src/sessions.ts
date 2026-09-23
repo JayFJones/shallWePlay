@@ -4,7 +4,10 @@
 // Many do not: `claude -p` just exits. Without this sweep its seat would
 // stay taken until the server restarts.
 
-import type { Table } from './game/table.js';
+// The lobby, in practice. Only leave() matters here.
+export interface Seats {
+  leave(id: string): { ok: boolean };
+}
 
 export interface Closable {
   close(): Promise<void>;
@@ -25,7 +28,7 @@ export class Sessions<T extends Closable> {
   private live = new Map<string, { transport: T; lastSeen: number }>();
 
   constructor(
-    private table: Table,
+    private seats: Seats,
     private limits: IdleLimits = DEFAULT_IDLE,
     private log: (message: string) => void = () => {},
     private now: () => number = Date.now,
@@ -46,7 +49,7 @@ export class Sessions<T extends Closable> {
   // Called from both DELETE and transport close, so it must be safe twice.
   end(id: string): void {
     if (!this.live.delete(id)) return;
-    this.table.leave(id);
+    this.seats.leave(id);
     this.log(`session ${short(id)} ended`);
   }
 
@@ -57,7 +60,7 @@ export class Sessions<T extends Closable> {
       if (idle >= this.limits.sessionMs) {
         this.end(id);
         void session.transport.close();
-      } else if (idle >= this.limits.seatMs && this.table.leave(id).ok) {
+      } else if (idle >= this.limits.seatMs && this.seats.leave(id).ok) {
         this.log(`session ${short(id)} lost its seat after ${Math.round(idle / 1000)}s idle`);
       }
     }
