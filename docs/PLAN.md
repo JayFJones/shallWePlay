@@ -144,6 +144,17 @@ The timeout stays under client tool limits.
 
 Gives up: a long wait costs the model a few extra calls.
 
+### A losing player cannot erase the loss (2026-09-23)
+
+Leaving mid-game forfeits the game to the other player. `new_game` is
+refused while a game is in progress. A player who joins after a finished
+game gets a fresh board.
+
+Why: an AI that is losing may try to leave or reset. Both moves now lose
+or get refused, and the tests prove it.
+
+Gives up: a player who drops by accident loses the game.
+
 ### Defaults taken without a question (2026-09-23)
 
 - Express for HTTP. The MCP SDK examples use it.
