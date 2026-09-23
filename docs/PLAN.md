@@ -100,6 +100,18 @@ Each step leaves something that works, and gets its own commit.
 - [ ] `tools/check.sh` passes.
 - [ ] Jay has read the README and it sounds like him.
 
+## Open issues
+
+### A client that exits without saying goodbye keeps its seat
+
+Found in step 4. `claude -p` exits without sending the DELETE that ends an
+MCP session. The server never hears that the player left, so the seat stays
+taken until the server restarts.
+
+Proposed fix for step 5: free a seat whose session has made no call for a
+few minutes. A player that is still playing calls `wait_for_turn` every 30
+seconds, so it never looks idle.
+
 ## Decisions
 
 ### Dropped foundryProbe, built a game instead (2026-09-23)

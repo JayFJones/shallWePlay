@@ -11,6 +11,9 @@ cd "$(dirname "$0")/.."
 BUDGETS="
 src/game/rules.ts                  90
 src/game/table.ts                  200
+src/mcp/text.ts                    80
+src/mcp/server.ts                  150
+src/http.ts                        120
 "
 
 fat=0
