@@ -18,6 +18,11 @@ export interface PlayOptions {
 // enough that one player cannot guess another's.
 const TOKEN = /^[A-Za-z0-9-]{16,64}$/;
 
+// A stream that stays silent while a player thinks gets cut by proxies,
+// and by Node's fetch after five minutes. A comment line keeps it open
+// without waking the page.
+const KEEPALIVE_MS = 25_000;
+
 // A browser player id can never equal an MCP session id.
 const playerId = (token: string): string => `web:${token}`;
 
@@ -81,8 +86,10 @@ export function mountPlay(app: Express, { lobby, graceMs = 60_000, sweepMs = 10_
     };
     push();
     const off = lobby.onChange(push);
+    const keepalive = setInterval(() => res.write(': keepalive\n\n'), KEEPALIVE_MS);
     req.on('close', () => {
       off();
+      clearInterval(keepalive);
       seen(token, -1);
     });
   });

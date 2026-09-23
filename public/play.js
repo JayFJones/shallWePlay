@@ -128,7 +128,10 @@ function render() {
   $('strange').hidden = !v.strangeGame;
   $('again').hidden = !v.outcome || !v.players[opponent];
   $('summon').hidden = Boolean(v.players[opponent]);
-  $('summon-add').textContent = `claude mcp add --transport http wopr ${location.origin}/mcp`;
+  // One command, from any folder: the server goes in as inline JSON, so no
+  // `claude mcp add` first, and -p runs the game without a chat prompt.
+  const config = JSON.stringify({ mcpServers: { wopr: { type: 'http', url: `${location.origin}/mcp` } } });
+  $('summon-run').textContent = `claude -p "/mcp__wopr__shall_we_play Joshua 1" --mcp-config '${config}' --allowedTools mcp__wopr`;
 }
 
 $('again').addEventListener('click', () => post('new'));

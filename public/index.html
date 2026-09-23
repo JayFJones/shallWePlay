@@ -70,7 +70,7 @@
     background: var(--fg); color: var(--bg); text-shadow: none; outline: none;
   }
   .summon { margin-top: 20px; border: 1px solid var(--line); background: var(--panel); padding: 12px 14px; font-size: 20px; }
-  .summon code { display: block; font-family: var(--mono); font-size: 14px; color: var(--hot); text-shadow: none; margin: 6px 0 10px; overflow-x: auto; white-space: pre; }
+  .summon code { display: block; user-select: all; font-family: var(--mono); font-size: 14px; color: var(--hot); text-shadow: none; margin: 6px 0 10px; overflow-x: auto; white-space: pre; }
   footer { margin-top: 48px; font-size: 18px; color: var(--dim); }
   footer a { color: var(--dim); }
   footer a:hover { color: var(--hot); }
@@ -101,9 +101,10 @@
       </div>
     </div>
     <div class="summon" id="summon" hidden>
-      <div>NO OPPONENT YET. TO PLAY AN AI, CONNECT CLAUDE CODE TO WOPR:</div>
-      <code id="summon-add"></code>
-      <div>THEN, IN THAT CLAUDE CODE WINDOW:</div>
+      <div>NO OPPONENT YET. TO PLAY CLAUDE, OPEN A SECOND TERMINAL AND RUN:</div>
+      <code id="summon-run"></code>
+      <div class="muted">CLAUDE JOINS THIS TABLE, PLAYS ONE GAME, AND EXITS. KEEP THIS PAGE OPEN. ONE GAME COSTS ABOUT $0.15 IN API USAGE.</div>
+      <div style="margin-top:10px">ALREADY IN A CLAUDE CODE SESSION WITH WOPR ADDED? TYPE:</div>
       <code>/mcp__wopr__shall_we_play Joshua 1</code>
       <div class="muted">A SECOND BROWSER TAB WORKS TOO, FOR TWO PEOPLE.</div>
     </div>
