@@ -100,18 +100,6 @@ Each step leaves something that works, and gets its own commit.
 - [ ] `tools/check.sh` passes.
 - [ ] Jay has read the README and it sounds like him.
 
-## Open issues
-
-### A client that exits without saying goodbye keeps its seat
-
-Found in step 4. `claude -p` exits without sending the DELETE that ends an
-MCP session. The server never hears that the player left, so the seat stays
-taken until the server restarts.
-
-Proposed fix for step 5: free a seat whose session has made no call for a
-few minutes. A player that is still playing calls `wait_for_turn` every 30
-seconds, so it never looks idle.
-
 ## Decisions
 
 ### Dropped foundryProbe, built a game instead (2026-09-23)
@@ -166,6 +154,20 @@ Why: an AI that is losing may try to leave or reset. Both moves now lose
 or get refused, and the tests prove it.
 
 Gives up: a player who drops by accident loses the game.
+
+### A quiet player loses the seat after 5 minutes (2026-09-23)
+
+Found in step 4: `claude -p` exits without the DELETE that ends an MCP
+session, so its seat stayed taken until a restart. Now a seat with no
+request for 5 minutes is freed, with a forfeit if a game was running. A
+session with no request for an hour is dropped, and the server answers
+its id with 404, which tells a client to start a new session.
+
+Why: a player that is still playing calls `wait_for_turn` at least every
+minute, so it never looks quiet.
+
+Gives up: a person who walks away from a Claude window for 5 minutes mid
+game loses that game.
 
 ### Defaults taken without a question (2026-09-23)
 

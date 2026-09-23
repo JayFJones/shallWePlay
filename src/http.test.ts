@@ -13,7 +13,7 @@ const clients: Client[] = [];
 const transports = new Map<Client, StreamableHTTPClientTransport>();
 
 before(async () => {
-  wopr = await startWopr(0);
+  wopr = await startWopr({ port: 0 });
 });
 
 after(async () => {

@@ -8,11 +8,19 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import { Table } from './game/table.js';
 import { createWoprServer } from './mcp/server.js';
+import { DEFAULT_IDLE, Sessions, type IdleLimits } from './sessions.js';
 
 // Localhost only. createMcpExpressApp then also checks the Host header,
 // which stops a web page elsewhere from reaching this server through DNS
 // rebinding.
 const HOST = '127.0.0.1';
+
+export interface WoprOptions {
+  port: number;
+  log?: (message: string) => void;
+  idle?: IdleLimits;
+  sweepMs?: number;
+}
 
 export interface Wopr {
   url: string;
@@ -20,44 +28,34 @@ export interface Wopr {
   close(): Promise<void>;
 }
 
-export type Log = (message: string) => void;
-
-export function startWopr(port: number, log: Log = () => {}): Promise<Wopr> {
+export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000 }: WoprOptions): Promise<Wopr> {
   const table = new Table();
-  const sessions = new Map<string, StreamableHTTPServerTransport>();
+  const sessions = new Sessions<StreamableHTTPServerTransport>(table, idle, log);
 
-  // A session can end by a DELETE from the client or by the transport
-  // closing. Either way the seat must be given up, once.
-  function endSession(id: string): void {
-    if (!sessions.delete(id)) return;
-    table.leave(id);
-    log(`session ${id.slice(0, 8)} ended`);
+  // The spec answers an unknown session with 404, which tells a client to
+  // start a new one. That matters once the idle sweep drops sessions.
+  function unknownSession(res: Response): void {
+    res.status(404).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Session not found. Start a new one.' }, id: null });
   }
 
   async function handlePost(req: Request, res: Response): Promise<void> {
     const id = req.header('mcp-session-id');
-    const existing = id ? sessions.get(id) : undefined;
-    if (existing) return existing.handleRequest(req, res, req.body);
-
-    if (id || !isInitializeRequest(req.body)) {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: { code: -32000, message: 'Unknown or missing session. Start with an initialize request.' },
-        id: null,
-      });
+    if (id) {
+      const transport = sessions.touch(id);
+      return transport ? transport.handleRequest(req, res, req.body) : unknownSession(res);
+    }
+    if (!isInitializeRequest(req.body)) {
+      res.status(400).json({ jsonrpc: '2.0', error: { code: -32000, message: 'Start with an initialize request.' }, id: null });
       return;
     }
 
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: randomUUID,
-      onsessioninitialized: (newId) => {
-        sessions.set(newId, transport);
-        log(`session ${newId.slice(0, 8)} started`);
-      },
-      onsessionclosed: endSession,
+      onsessioninitialized: (newId) => sessions.add(newId, transport),
+      onsessionclosed: (closedId) => sessions.end(closedId),
     });
     transport.onclose = () => {
-      if (transport.sessionId) endSession(transport.sessionId);
+      if (transport.sessionId) sessions.end(transport.sessionId);
     };
 
     await createWoprServer(table).connect(transport);
@@ -65,11 +63,8 @@ export function startWopr(port: number, log: Log = () => {}): Promise<Wopr> {
   }
 
   async function handleSession(req: Request, res: Response): Promise<void> {
-    const transport = sessions.get(req.header('mcp-session-id') ?? '');
-    if (!transport) {
-      res.status(400).send('Unknown or missing session.');
-      return;
-    }
+    const transport = sessions.touch(req.header('mcp-session-id') ?? '');
+    if (!transport) return unknownSession(res);
     await transport.handleRequest(req, res);
   }
 
@@ -77,6 +72,8 @@ export function startWopr(port: number, log: Log = () => {}): Promise<Wopr> {
   app.post('/mcp', handlePost);
   app.get('/mcp', handleSession);
   app.delete('/mcp', handleSession);
+
+  const sweeper = setInterval(() => sessions.sweep(), sweepMs);
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, HOST, () => {
@@ -86,13 +83,17 @@ export function startWopr(port: number, log: Log = () => {}): Promise<Wopr> {
         url: `http://localhost:${bound}`,
         table,
         close: async () => {
-          await Promise.all([...sessions.values()].map((t) => t.close()));
+          clearInterval(sweeper);
+          await sessions.closeAll();
           // Clients hold keep-alive sockets open, and close() waits on them.
           server.closeAllConnections();
           await new Promise<void>((done) => server.close(() => done()));
         },
       });
     });
-    server.once('error', reject);
+    server.once('error', (error) => {
+      clearInterval(sweeper);
+      reject(error);
+    });
   });
 }

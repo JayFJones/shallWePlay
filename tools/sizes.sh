@@ -14,6 +14,7 @@ src/game/table.ts                  200
 src/mcp/text.ts                    80
 src/mcp/server.ts                  150
 src/http.ts                        120
+src/sessions.ts                    100
 "
 
 fat=0
