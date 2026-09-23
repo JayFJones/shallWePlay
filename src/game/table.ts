@@ -2,41 +2,11 @@
 // waiting, and reports each finished game. The rules live in rules.ts, and
 // which player sits at which table is the lobby's business.
 
-import { applyMove, newGame, other, type Board, type GameState, type Mark, type MoveError, type Outcome } from './rules.js';
+import { randomUUID } from 'node:crypto';
+import { applyMove, newGame, other, type GameState, type Mark } from './rules.js';
+import type { Ending, FinishedGame, PlayerId, Result, TableView, WaitStatus } from './types.js';
 
-// Whoever connects gets an id from the transport: an MCP session id, or a
-// browser token. The table only compares them.
-export type PlayerId = string;
-
-export type Ending = Outcome | { kind: 'forfeit'; winner: Mark };
-
-export interface TableView {
-  table: string;
-  board: Board;
-  toMove: Mark;
-  outcome: Ending | null;
-  players: Record<Mark, string | null>;
-  you: Mark | null;
-  drawStreak: number;
-  strangeGame: boolean;
-}
-
-// Enough to replay the game square by square.
-export interface FinishedGame {
-  table: string;
-  players: Record<Mark, string | null>;
-  firstToMove: Mark;
-  moves: number[];
-  outcome: Ending;
-  startedAt: string;
-  endedAt: string;
-}
-
-export type TableError = MoveError | 'table_full' | 'not_seated' | 'no_opponent' | 'game_in_progress';
-
-export type Result<T> = { ok: true; value: T } | { ok: false; error: TableError };
-
-export type WaitStatus = 'your_turn' | 'game_over' | 'still_waiting' | 'not_seated';
+export type { Ending, FinishedGame, PlayerId, Result, TableError, TableView, WaitStatus } from './types.js';
 
 // WarGames: Joshua gives up on tic-tac-toe after enough draws. Three is
 // enough to see it happen in a demo without playing all night.
@@ -53,6 +23,7 @@ export class Table {
   private seats: Record<Mark, Seat | null> = { X: null, O: null };
   private game: GameState = newGame('X');
   private first: Mark = 'X';
+  private gameId: string = randomUUID();
   private moves: number[] = [];
   private startedAt: number;
   private forfeitWinner: Mark | null = null;
@@ -132,6 +103,7 @@ export class Table {
   view(id?: PlayerId): TableView {
     return {
       table: this.id,
+      game: this.gameId,
       board: this.game.board,
       toMove: this.game.toMove,
       outcome: this.outcome(),
@@ -218,6 +190,7 @@ export class Table {
     this.game = newGame(first);
     this.first = first;
     this.moves = [];
+    this.gameId = randomUUID();
     this.startedAt = this.now();
     this.forfeitWinner = null;
   }
@@ -227,6 +200,7 @@ export class Table {
     if (!outcome) return;
     const game: FinishedGame = {
       table: this.id,
+      game: this.gameId,
       players: this.names(),
       firstToMove: this.first,
       moves: [...this.moves],

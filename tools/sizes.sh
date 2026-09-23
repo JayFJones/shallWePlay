@@ -11,9 +11,11 @@ cd "$(dirname "$0")/.."
 BUDGETS="
 src/game/rules.ts                  90
 # table.ts: raised from 200 when it began recording finished games for
-# the history. The record reads the private move list and clock, so it
+# the history, then lowered from 250 when its shared types moved to
+# types.ts. The record reads the private move list and clock, so it
 # belongs with them.
-src/game/table.ts                  250
+src/game/table.ts                  230
+src/game/types.ts                  60
 src/game/lobby.ts                  100
 # text.ts: raised from 80 when the greeting and the shall_we_play steps
 # moved in. It holds every word the model reads, on purpose, in one place.

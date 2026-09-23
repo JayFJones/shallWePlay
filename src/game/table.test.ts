@@ -221,9 +221,12 @@ test('a won game is reported once, with everything needed to replay it', () => {
   playAll(table, X_WINS);
   table.move('b', 9);
 
+  assert.equal(games.length, 1);
+  assert.equal(games[0]!.game, table.view().game);
   assert.deepEqual(games, [
     {
       table: '7',
+      game: games[0]!.game,
       players: { X: 'Alice', O: 'Bob' },
       firstToMove: 'X',
       moves: X_WINS,
@@ -262,4 +265,13 @@ test('the next game records who went first and only its own moves', () => {
   playAll(table, DRAW);
   assert.equal(games[1]!.firstToMove, 'O');
   assert.deepEqual(games[1]!.moves, DRAW);
+});
+
+test('each game gets its own id, and it changes with a new game', () => {
+  const table = seated();
+  const first = table.view().game;
+  playAll(table, X_WINS);
+  assert.equal(table.view().game, first);
+  table.newGame('a');
+  assert.notEqual(table.view().game, first);
 });

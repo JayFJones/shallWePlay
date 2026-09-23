@@ -9,6 +9,7 @@ import { History } from './history.js';
 function game(winner: 'X' | 'O'): FinishedGame {
   return {
     table: '1',
+    game: 'g-1',
     players: { X: 'Joshua', O: 'Falken' },
     firstToMove: 'X',
     moves: [1, 4, 2, 5, 3],
