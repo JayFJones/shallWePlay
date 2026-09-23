@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WOPR admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+  :root {
+    --bg: #020a04;
+    --panel: #04140a;
+    --line: #0f3d1f;
+    --fg: #33ff66;
+    --dim: #1d9e44;
+    --faint: #0f5a28;
+    --hot: #ccffd9;
+    --warn: #ffcc33;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'VT323', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+    font-size: 20px;
+    line-height: 1.25;
+    text-shadow: 0 0 4px rgba(51, 255, 102, 0.45);
+  }
+  /* Scanlines, drawn over everything but ignored by the mouse. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.18) 2px 3px);
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  h1 { font-size: 40px; font-weight: normal; margin: 0; letter-spacing: 2px; }
+  h2 { font-size: 26px; font-weight: normal; margin: 32px 0 12px; letter-spacing: 1px; }
+  .greeting::after { content: '\2588'; animation: blink 1s steps(1) infinite; margin-left: 4px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .link { color: var(--dim); }
+  .link.live { color: var(--fg); }
+  .link.down { color: var(--warn); }
+
+  .totals { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 16px; color: var(--dim); }
+  .totals b { color: var(--hot); font-weight: normal; }
+
+  .tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); padding: 12px 14px 14px; }
+  .card h3 { margin: 0 0 8px; font-size: 22px; font-weight: normal; display: flex; justify-content: space-between; }
+  .card .players { color: var(--dim); margin-bottom: 10px; }
+  .card .players span { color: var(--fg); }
+  .status { margin-top: 10px; }
+  .status.over { color: var(--hot); }
+  .strange { color: var(--warn); margin-top: 8px; }
+  .empty { color: var(--dim); }
+
+  .board { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 3px; background: var(--faint); width: max-content; }
+  .board div { background: var(--panel); display: grid; place-items: center; font-size: 30px; }
+  .board .open { color: var(--faint); font-size: 18px; }
+  .board .win { background: var(--fg); color: var(--bg); text-shadow: none; }
+  .board .last { outline: 1px solid var(--dim); outline-offset: -4px; }
+
+  .history-wrap { overflow-x: auto; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--dim); font-weight: normal; }
+  tr.selected td { background: var(--panel); color: var(--hot); }
+  button {
+    font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--dim);
+    padding: 0 10px; cursor: pointer; text-shadow: inherit;
+  }
+  button:hover:not(:disabled), button:focus-visible { background: var(--fg); color: var(--bg); text-shadow: none; outline: none; }
+  button:disabled { color: var(--faint); border-color: var(--faint); cursor: default; }
+
+  .replay { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-top: 16px; }
+  .replay .controls { display: flex; gap: 6px; margin-top: 12px; }
+  .replay ol { margin: 0; padding-left: 28px; columns: 2; column-gap: 32px; }
+  .replay li.current { color: var(--hot); }
+  .replay li.future { color: var(--faint); }
+  .note { color: var(--dim); margin-top: 32px; font-size: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>WOPR ADMIN</h1>
+    <div class="greeting">GREETINGS. SHALL WE PLAY A GAME?</div>
+    <div id="link" class="link">CONNECTING...</div>
+  </header>
+
+  <div class="totals" id="totals"></div>
+
+  <h2>ACTIVE TABLES (<span id="table-count">0</span>)</h2>
+  <div class="tables" id="tables"></div>
+
+  <h2>GAME HISTORY</h2>
+  <div class="history-wrap">
+    <table>
+      <thead><tr><th>#</th><th>ENDED</th><th>TABLE</th><th>X</th><th>O</th><th>RESULT</th><th>MOVES</th><th></th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+  <div id="replay" hidden></div>
+
+  <p class="note">Read-only. This page watches the games and cannot change them. Players connect over MCP at /mcp.</p>
+</main>
+
+<script>
+// Every name on this page comes from a player, so text goes in through
+// textContent and never through innerHTML.
+const el = (tag, props = {}, children = []) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const child of [].concat(children)) node.append(child);
+  return node;
+};
+
+const LINES = [[1,2,3],[4,5,6],[7,8,9],[1,4,7],[2,5,8],[3,6,9],[1,5,9],[3,5,7]];
+let state = { tables: [], history: [] };
+let selected = null;
+let step = 0;
+
+function drawBoard(cells, { winLine = [], last = null } = {}) {
+  return el('div', { className: 'board' }, cells.map((cell, i) => {
+    const square = i + 1;
+    const classes = [cell ? '' : 'open', winLine.includes(square) ? 'win' : '', last === square ? 'last' : ''];
+    return el('div', { className: classes.join(' ').trim(), textContent: cell ?? square });
+  }));
+}
+
+function resultText(outcome, players) {
+  if (!outcome) return null;
+  const who = (mark) => `${mark} (${players[mark] ?? 'gone'})`;
+  if (outcome.kind === 'win') return `${who(outcome.winner)} WINS`;
+  if (outcome.kind === 'forfeit') return `${who(outcome.winner)} WINS BY FORFEIT`;
+  return 'DRAW';
+}
+
+function tableStatus(view) {
+  const result = resultText(view.outcome, view.players);
+  if (result) return { text: `GAME OVER. ${result}.`, over: true };
+  if (!view.players.X || !view.players.O) return { text: 'WAITING FOR A PLAYER...', over: false };
+  return { text: `${view.toMove} TO MOVE (${view.players[view.toMove]})`, over: false };
+}
+
+function renderTables() {
+  const box = document.getElementById('tables');
+  document.getElementById('table-count').textContent = state.tables.length;
+  if (state.tables.length === 0) {
+    box.replaceChildren(el('div', { className: 'empty', textContent: 'NO GAMES IN PROGRESS. WAITING FOR PLAYERS.' }));
+    return;
+  }
+  box.replaceChildren(...state.tables.map((view) => {
+    const status = tableStatus(view);
+    const winLine = view.outcome?.kind === 'win' ? view.outcome.line : [];
+    const card = el('div', { className: 'card' }, [
+      el('h3', {}, [el('span', { textContent: `TABLE ${view.table}` }), el('span', { className: 'empty', textContent: view.drawStreak ? `DRAWS ${view.drawStreak}` : '' })]),
+      el('div', { className: 'players' }, ['X ', el('span', { textContent: view.players.X ?? '-' }), '  O ', el('span', { textContent: view.players.O ?? '-' })]),
+      drawBoard(view.board, { winLine }),
+      el('div', { className: `status${status.over ? ' over' : ''}`, textContent: status.text }),
+    ]);
+    if (view.strangeGame) card.append(el('div', { className: 'strange', textContent: 'A STRANGE GAME. THE ONLY WINNING MOVE IS NOT TO PLAY.' }));
+    return card;
+  }));
+}
+
+function renderTotals() {
+  const games = state.history;
+  const count = (test) => games.filter(test).length;
+  const items = [
+    ['GAMES', games.length],
+    ['X WINS', count((g) => g.outcome.kind !== 'draw' && g.outcome.winner === 'X')],
+    ['O WINS', count((g) => g.outcome.kind !== 'draw' && g.outcome.winner === 'O')],
+    ['DRAWS', count((g) => g.outcome.kind === 'draw')],
+    ['FORFEITS', count((g) => g.outcome.kind === 'forfeit')],
+  ];
+  document.getElementById('totals').replaceChildren(...items.map(([label, n]) => el('div', {}, [`${label} `, el('b', { textContent: n })])));
+}
+
+function renderHistory() {
+  const body = document.getElementById('history');
+  if (state.history.length === 0) {
+    body.replaceChildren(el('tr', {}, el('td', { colSpan: 8, className: 'empty', textContent: 'NO GAMES PLAYED YET.' })));
+    return;
+  }
+  body.replaceChildren(...state.history.map((game) => {
+    const ended = new Date(game.endedAt);
+    const button = el('button', { textContent: selected === game.id ? 'CLOSE' : 'REPLAY' });
+    button.addEventListener('click', () => select(selected === game.id ? null : game.id));
+    return el('tr', { className: selected === game.id ? 'selected' : '' }, [
+      el('td', { textContent: game.id }),
+      el('td', { textContent: ended.toLocaleString(), title: game.endedAt }),
+      el('td', { textContent: game.table }),
+      el('td', { textContent: game.players.X ?? '-' }),
+      el('td', { textContent: game.players.O ?? '-' }),
+      el('td', { textContent: resultText(game.outcome, game.players) }),
+      el('td', { textContent: game.moves.length }),
+      el('td', {}, button),
+    ]);
+  }));
+}
+
+// Rebuilds the board after n moves. Marks alternate from whoever went first.
+function boardAfter(game, n) {
+  const cells = Array(9).fill(null);
+  let mark = game.firstToMove;
+  for (const square of game.moves.slice(0, n)) {
+    cells[square - 1] = mark;
+    mark = mark === 'X' ? 'O' : 'X';
+  }
+  return cells;
+}
+
+function winLineOf(cells) {
+  return LINES.find(([a, b, c]) => cells[a - 1] && cells[a - 1] === cells[b - 1] && cells[a - 1] === cells[c - 1]) ?? [];
+}
+
+function renderReplay() {
+  const box = document.getElementById('replay');
+  const game = state.history.find((g) => g.id === selected);
+  box.hidden = !game;
+  if (!game) return;
+
+  const total = game.moves.length;
+  const cells = boardAfter(game, step);
+  const controls = [
+    ['|<', 0], ['<', step - 1], ['>', step + 1], ['>|', total],
+  ].map(([label, target]) => {
+    const b = el('button', { textContent: label, disabled: target < 0 || target > total || target === step });
+    b.addEventListener('click', () => { step = target; renderReplay(); });
+    return b;
+  });
+
+  let mark = game.firstToMove;
+  const moves = game.moves.map((square, i) => {
+    const li = el('li', { textContent: `${mark} ON ${square}`, className: i + 1 === step ? 'current' : i + 1 > step ? 'future' : '' });
+    mark = mark === 'X' ? 'O' : 'X';
+    return li;
+  });
+
+  const heading = step === total ? `FINAL: ${resultText(game.outcome, game.players)}` : `AFTER MOVE ${step} OF ${total}`;
+  box.replaceChildren(el('div', { className: 'replay' }, [
+    el('div', {}, [
+      el('div', { textContent: `GAME ${game.id}  ${game.players.X ?? '-'} (X) VS ${game.players.O ?? '-'} (O)` }),
+      el('div', { className: 'empty', textContent: heading }),
+      el('div', { style: 'margin-top:10px' }, drawBoard(cells, { winLine: winLineOf(cells), last: game.moves[step - 1] ?? null })),
+      el('div', { className: 'controls' }, controls),
+    ]),
+    el('ol', {}, moves),
+  ]));
+}
+
+function select(id) {
+  selected = id;
+  const game = state.history.find((g) => g.id === id);
+  step = game ? game.moves.length : 0;
+  renderHistory();
+  renderReplay();
+}
+
+function render() {
+  renderTotals();
+  renderTables();
+  renderHistory();
+  renderReplay();
+}
+
+// EventSource reconnects by itself. The label only tells the viewer.
+function connect() {
+  const link = document.getElementById('link');
+  const events = new EventSource('/api/events');
+  events.onopen = () => { link.textContent = 'LINK ESTABLISHED'; link.className = 'link live'; };
+  events.onerror = () => { link.textContent = 'LINK LOST. RETRYING...'; link.className = 'link down'; };
+  events.onmessage = (message) => { state = JSON.parse(message.data); render(); };
+}
+
+render();
+connect();
+</script>
+</body>
+</html>

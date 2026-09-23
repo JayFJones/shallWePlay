@@ -130,3 +130,33 @@ test('ending a session gives up its seat', async () => {
   await transports.get(joshua)!.terminateSession();
   assert.deepEqual(wopr.lobby.views()[0]!.players, { X: null, O: 'Falken' });
 });
+
+test('the admin state lists live tables and finished games', async () => {
+  const res = await fetch(`${wopr.url}/api/state`);
+  const state = (await res.json()) as { tables: { table: string }[]; history: { id: number; moves: number[] }[] };
+  assert.deepEqual(state.tables.map((t) => t.table), ['1']);
+  assert.deepEqual(state.history.map((g) => g.moves.length), [9]);
+});
+
+test('the admin stream sends the state at once and again on every change', async () => {
+  const controller = new AbortController();
+  const res = await fetch(`${wopr.url}/api/events`, { signal: controller.signal });
+  assert.equal(res.headers.get('content-type'), 'text/event-stream');
+  const reader = res.body!.getReader();
+  const next = async (): Promise<{ tables: { players: { X: string | null } }[] }> => {
+    const { value } = await reader.read();
+    return JSON.parse(new TextDecoder().decode(value).replace(/^data: /, ''));
+  };
+
+  assert.equal((await next()).tables.length, 1);
+  const seated = await connect();
+  await call(seated, 'join_game', { name: 'Newcomer' });
+  assert.equal((await next()).tables[0]!.players.X, 'Newcomer');
+  controller.abort();
+});
+
+test('the admin page is served', async () => {
+  const res = await fetch(`${wopr.url}/admin`);
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /WOPR ADMIN/);
+});

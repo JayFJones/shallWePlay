@@ -6,6 +6,7 @@ import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
+import { mountAdmin } from './admin.js';
 import { Lobby } from './game/lobby.js';
 import { History } from './history.js';
 import { createWoprServer } from './mcp/server.js';
@@ -82,6 +83,7 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
   app.post('/mcp', handlePost);
   app.get('/mcp', handleSession);
   app.delete('/mcp', handleSession);
+  const admin = mountAdmin(app, lobby, history);
 
   const sweeper = setInterval(() => sessions.sweep(), sweepMs);
 
@@ -95,6 +97,7 @@ export function startWopr(options: WoprOptions): Promise<Wopr> {
         history,
         close: async () => {
           clearInterval(sweeper);
+          admin.close();
           await sessions.closeAll();
           // Clients hold keep-alive sockets open, and close() waits on them.
           server.closeAllConnections();
