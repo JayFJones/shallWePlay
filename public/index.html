@@ -70,7 +70,14 @@
     background: var(--fg); color: var(--bg); text-shadow: none; outline: none;
   }
   .summon { margin-top: 20px; border: 1px solid var(--line); background: var(--panel); padding: 12px 14px; font-size: 20px; }
-  .summon code { display: block; user-select: all; font-family: var(--mono); font-size: 14px; color: var(--hot); text-shadow: none; margin: 6px 0 10px; overflow-x: auto; white-space: pre; }
+  .copyable { display: flex; align-items: stretch; gap: 8px; margin: 6px 0 10px; }
+  .summon code { flex: 1; min-width: 0; user-select: all; font-family: var(--mono); font-size: 14px; color: var(--hot); text-shadow: none; overflow-x: auto; white-space: pre; background: var(--bg); border: 1px solid var(--line); padding: 8px 10px; }
+  button.copy {
+    flex: none; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 18px;
+    color: var(--fg); background: transparent; border: 1px solid var(--dim); padding: 0 10px; cursor: pointer; text-shadow: inherit;
+  }
+  button.copy:hover, button.copy:focus-visible { background: var(--fg); color: var(--bg); text-shadow: none; outline: none; }
+  button.copy.done { border-color: var(--hot); color: var(--hot); }
   footer { margin-top: 48px; font-size: 18px; color: var(--dim); }
   footer a { color: var(--dim); }
   footer a:hover { color: var(--hot); }
@@ -102,10 +109,10 @@
     </div>
     <div class="summon" id="summon" hidden>
       <div>NO OPPONENT YET. TO PLAY CLAUDE, OPEN A SECOND TERMINAL AND RUN:</div>
-      <code id="summon-run"></code>
+      <div class="copyable"><code id="summon-run"></code><button type="button" class="copy" data-copy="summon-run" aria-label="Copy the command" title="Copy"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 5V2H2v9h3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>COPY</span></button></div>
       <div class="muted">CLAUDE JOINS THIS TABLE, PLAYS ONE GAME, AND EXITS. KEEP THIS PAGE OPEN. ONE GAME COSTS ABOUT $0.15 IN API USAGE.</div>
       <div style="margin-top:10px">ALREADY IN A CLAUDE CODE SESSION WITH WOPR ADDED? TYPE:</div>
-      <code>/mcp__wopr__shall_we_play Joshua 1</code>
+      <div class="copyable"><code id="summon-slash">/mcp__wopr__shall_we_play Joshua 1</code><button type="button" class="copy" data-copy="summon-slash" aria-label="Copy the slash command" title="Copy"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 5V2H2v9h3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>COPY</span></button></div>
       <div class="muted">A SECOND BROWSER TAB WORKS TOO, FOR TWO PEOPLE.</div>
     </div>
   </div>

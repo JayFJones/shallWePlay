@@ -134,6 +134,32 @@ function render() {
   $('summon-run').textContent = `claude -p "/mcp__wopr__shall_we_play Joshua 1" --mcp-config '${config}' --allowedTools mcp__wopr`;
 }
 
+// The clipboard API needs a secure page, which localhost is. The fallback
+// covers a page opened by another host name.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  }
+}
+
+for (const button of document.querySelectorAll('button.copy')) {
+  const label = button.querySelector('span');
+  button.addEventListener('click', async () => {
+    const ok = await copyText($(button.dataset.copy).textContent);
+    label.textContent = ok ? 'COPIED' : 'SELECT AND COPY';
+    button.classList.toggle('done', ok);
+    setTimeout(() => { label.textContent = 'COPY'; button.classList.remove('done'); }, 1500);
+  });
+}
+
 $('again').addEventListener('click', () => post('new'));
 $('leave').addEventListener('click', async () => {
   await post('leave');
