@@ -92,6 +92,10 @@ export class Table {
     if (!this.markOf(id)) return { ok: false, error: 'not_seated' };
     if (this.inProgress()) return { ok: false, error: 'game_in_progress' };
 
+    // Both players often ask for the next game at once. The second request
+    // must not reset again, or the first move would swap back.
+    if (this.fresh()) return { ok: true, value: this.view(id) };
+
     // Whoever moved second last time moves first this time.
     this.reset(other(this.firstToMove()));
     this.changed();
@@ -113,19 +117,24 @@ export class Table {
   // MCP clients call the server, never the other way round, so a player
   // cannot be told "your turn". Instead the call itself waits, and gives up
   // after the timeout so it stays inside the client's tool time limit.
-  waitForTurn(id: PlayerId, timeoutMs: number): Promise<{ status: WaitStatus; view: TableView }> {
+  // A cancelled call stops waiting at once instead of holding a listener
+  // until the timeout.
+  waitForTurn(id: PlayerId, timeoutMs: number, signal?: AbortSignal): Promise<{ status: WaitStatus; view: TableView }> {
     return new Promise((resolve) => {
-      const check = (timedOut: boolean): boolean => {
+      const check = (giveUp: boolean): boolean => {
         const status = this.waitStatus(id);
-        if (status === 'still_waiting' && !timedOut) return false;
+        if (status === 'still_waiting' && !giveUp) return false;
         clearTimeout(timer);
         unsubscribe();
+        signal?.removeEventListener('abort', onAbort);
         resolve({ status, view: this.view(id) });
         return true;
       };
+      const onAbort = (): boolean => check(true);
       const timer = setTimeout(() => check(true), timeoutMs);
       const unsubscribe = this.onChange(() => check(false));
-      check(false);
+      signal?.addEventListener('abort', onAbort);
+      check(signal?.aborted ?? false);
     });
   }
 
@@ -151,6 +160,10 @@ export class Table {
   private outcome(): Ending | null {
     if (this.forfeitWinner) return { kind: 'forfeit', winner: this.forfeitWinner };
     return this.game.outcome;
+  }
+
+  private fresh(): boolean {
+    return !this.outcome() && this.game.board.every((cell) => cell === null);
   }
 
   private inProgress(): boolean {

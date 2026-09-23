@@ -192,3 +192,20 @@ test('a finished wait stops listening', async () => {
   await waiting;
   assert.equal(listeners(), 0);
 });
+
+test('two requests for the next game make one new game, not two', () => {
+  const table = seated();
+  playAll(table, X_WINS);
+  table.newGame('a');
+  table.newGame('b');
+  assert.equal(table.view().toMove, 'O');
+});
+
+test('a cancelled wait returns at once and stops listening', async () => {
+  const table = seated();
+  const controller = new AbortController();
+  const waiting = table.waitForTurn('b', 60_000, controller.signal);
+  controller.abort();
+  assert.equal((await waiting).status, 'still_waiting');
+  assert.equal((Reflect.get(table, 'listeners') as Set<unknown>).size, 0);
+});
