@@ -11,3 +11,6 @@ SETUP.md
 .agents/
 .claude/
 skills-lock.json
+
+# Game history. Written by the server, different on every machine.
+data/

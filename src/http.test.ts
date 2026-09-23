@@ -84,6 +84,7 @@ test('two clients play a whole game by waiting for turns, and cheating is refuse
   const [xEnd, oEnd] = await Promise.all([playOut(joshua, [5, 3, 4, 2, 9]), playOut(falken, [1, 7, 6, 8])]);
   assert.match(xEnd, /GAME OVER\. A draw\./);
   assert.match(oEnd, /GAME OVER\. A draw\./);
+  assert.deepEqual(wopr.history.list().map((g) => [g.players.X, g.players.O, g.outcome.kind]), [['Joshua', 'Falken', 'draw']]);
 
   const taken = await call(falken, 'make_move', { square: 5 });
   assert.equal(taken.isError, true);

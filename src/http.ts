@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import { Lobby } from './game/lobby.js';
+import { History } from './history.js';
 import { createWoprServer } from './mcp/server.js';
 import { DEFAULT_IDLE, Sessions, type IdleLimits } from './sessions.js';
 
@@ -20,16 +21,25 @@ export interface WoprOptions {
   log?: (message: string) => void;
   idle?: IdleLimits;
   sweepMs?: number;
+  // Where finished games are appended. Leave out to keep them in memory.
+  historyFile?: string;
 }
 
 export interface Wopr {
   url: string;
   lobby: Lobby;
+  history: History;
   close(): Promise<void>;
 }
 
-export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000 }: WoprOptions): Promise<Wopr> {
+export function startWopr(options: WoprOptions): Promise<Wopr> {
+  const { port, log = () => {}, idle = DEFAULT_IDLE, sweepMs = 60_000, historyFile } = options;
   const lobby = new Lobby();
+  const history = new History(historyFile ?? null, log);
+  lobby.onFinish((game) => {
+    const { id, table, outcome } = history.record(game);
+    log(`game ${id} at table ${table} ended: ${outcome.kind}`);
+  });
   const sessions = new Sessions<StreamableHTTPServerTransport>(lobby, idle, log);
 
   // The spec answers an unknown session with 404, which tells a client to
@@ -82,6 +92,7 @@ export function startWopr({ port, log = () => {}, idle = DEFAULT_IDLE, sweepMs =
       resolve({
         url: `http://localhost:${bound}`,
         lobby,
+        history,
         close: async () => {
           clearInterval(sweeper);
           await sessions.closeAll();
