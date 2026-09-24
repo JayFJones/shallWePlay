@@ -106,7 +106,8 @@ Each step leaves something that works, and gets its own commit.
    2026-09-23: a script making the page's own HTTP calls played a real
    `claude -p` session to a draw. Not yet seen in a real browser.
 7. `TRANSCRIPT.md`: one full AI against AI game from both windows, with the
-   tool calls, and one cheat attempt refused.
+   tool calls, and one cheat attempt refused. Done 2026-09-24. Falken was
+   told to try one taken square, and the transcript says so.
 8. `README.md`, drafted in Jay's voice for Jay to edit.
 
 ## Done means
@@ -117,8 +118,8 @@ Each step leaves something that works, and gets its own commit.
 - [x] Two Claude Code windows play a full game with no help. Checked with
       two `claude -p` sessions: 3 games, 3 draws, the strange game line.
 - [x] A person in the browser plays one AI. Jay played Joshua to a draw.
-- [ ] The server refuses a cheat move, and the transcript shows it. The
-      tests prove the refusal. `TRANSCRIPT.md` does not exist yet.
+- [x] The server refuses a cheat move, and the transcript shows it.
+      `TRANSCRIPT.md`, recorded 2026-09-24.
 - [x] `tools/check.sh` passes.
 - [ ] Jay has read the README and it sounds like him.
 

@@ -51,6 +51,9 @@ This is a fan homage. It has no connection to the film or its studio.
 
 ## What it shows about MCP
 
+[TRANSCRIPT.md](TRANSCRIPT.md) shows one full game between two Claude
+players, every MCP call included, with one cheat attempt refused.
+
 - **Tools, a resource, and a prompt.** Six tools play the game. The
   `wopr://board` resource shows the board. The `shall_we_play` prompt gives
   a model the steps for a whole match, so one slash command in Claude Code
