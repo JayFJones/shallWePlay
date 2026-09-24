@@ -155,7 +155,7 @@ export function createWoprServer(lobby: Lobby): McpServer {
       description: 'Play a whole tic-tac-toe match on WOPR: join, wait, move, and repeat until the match ends.',
       argsSchema: {
         name: z.string().optional().describe('Your name at the table. Default: Joshua.'),
-        games: z.string().optional().describe('How many games to play. Default: 1.'),
+        games: z.string().optional().describe('How many games to play, 1 to 10. Default: 1.'),
       },
     },
     ({ name, games }) => {

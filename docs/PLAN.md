@@ -111,12 +111,15 @@ Each step leaves something that works, and gets its own commit.
 
 ## Done means
 
-- [ ] `git clone`, `npm install`, `npm run dev:up`, and the page loads on
-      http://localhost:5171.
-- [ ] Two Claude Code windows play a full game with no help.
-- [ ] A person in the browser plays one AI.
-- [ ] The server refuses a cheat move, and the transcript shows it.
-- [ ] `tools/check.sh` passes.
+- [x] `git clone`, `npm install`, `npm run dev:up`, and the page loads on
+      http://localhost:5171. Checked on this machine, not yet on a clean
+      one.
+- [x] Two Claude Code windows play a full game with no help. Checked with
+      two `claude -p` sessions: 3 games, 3 draws, the strange game line.
+- [x] A person in the browser plays one AI. Jay played Joshua to a draw.
+- [ ] The server refuses a cheat move, and the transcript shows it. The
+      tests prove the refusal. `TRANSCRIPT.md` does not exist yet.
+- [x] `tools/check.sh` passes.
 - [ ] Jay has read the README and it sounds like him.
 
 ## Decisions
