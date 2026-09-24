@@ -172,7 +172,7 @@ npm run check
 ```
 
 This runs the typecheck, 75 tests, the build, and a line budget on the main
-source file. The same command runs before every commit, through a git hook.
+source files. The same command runs before every commit, through a git hook.
 Everything runs on your machine. There is no cloud CI.
 
 The tests include real MCP clients playing full games over HTTP against a
